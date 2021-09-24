@@ -508,7 +508,7 @@ class CQLPolicy(Policy):
             'td_error': td_error_per_sample.detach().mean().item(),
             'alpha': self._alpha.item(),
             'target_value': target_value.detach().mean().item(),
-            rad': self._model.actor.gns.sqr_avg(), 
+            'actor_grad_sqr': self._model.actor.gns.sqr_avg(), 
             'actor_grad_var': self._model.actor.gns.var_avg(),
             'critic_grad_sqr': self._model.critic.gns.sqr_avg(), 
             'critic_grad_var': self._model.critic.gns.var_avg(),
