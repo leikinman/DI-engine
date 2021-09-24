@@ -508,8 +508,8 @@ class CQLPolicy(Policy):
             'td_error': td_error_per_sample.detach().mean().item(),
             'alpha': self._alpha.item(),
             'target_value': target_value.detach().mean().item(),
-            'actor_gns_sqr': self._model.actor.gns.sqr_avg(), 
-            'actor_gns_var': self._model.actor.gns.var_avg(),
+            rad': self._model.actor.gns.sqr_avg(), 
+            'actor_grad_var': self._model.actor.gns.var_avg(),
             'critic_grad_sqr': self._model.critic.gns.sqr_avg(), 
             'critic_grad_var': self._model.critic.gns.var_avg(),
             **info_dict,
@@ -642,12 +642,12 @@ class CQLPolicy(Policy):
         if self._auto_alpha:
             return super()._monitor_vars_learn() + [
                 'alpha_loss', 'policy_loss', 'critic_loss', 'cur_lr_q', 'cur_lr_p', 'target_q_value', 'q_value_1',
-                'q_value_2', 'alpha', 'td_error', 'target_value', 'cur_bsz', 'actor_gns_sqr', 'actor_gns_var', 'critic_gns_sqr', 'critic_gns_var'
+                'q_value_2', 'alpha', 'td_error', 'target_value', 'cur_bsz', 'actor_grad_sqr', 'actor_grad_var', 'critic_grad_sqr', 'critic_grad_var'
             ] + twin_critic
         else:
             return super()._monitor_vars_learn() + [
                 'policy_loss', 'critic_loss', 'cur_lr_q', 'cur_lr_p', 'target_q_value', 'q_value_1', 'q_value_2',
-                'alpha', 'td_error', 'target_value', 'cur_bsz', 'actor_gns_sqr', 'actor_gns_var', 'critic_gns_sqr', 'critic_gns_var'
+                'alpha', 'td_error', 'target_value', 'cur_bsz', 'actor_grad_sqr', 'actor_grad_var', 'critic_grad_sqr', 'critic_grad_var'
             ] + twin_critic
 
     def _get_policy_actions(self, data: Dict, num_actions=10, epsilon: float = 1e-6) -> List:
