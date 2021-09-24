@@ -10,11 +10,12 @@ from ding.worker import BaseLearner, InteractionSerialEvaluator, BaseSerialComma
     create_serial_collector
 from ding.config import read_config, compile_config
 from ding.policy import create_policy, PolicyFactory
-from ding.utils import set_pkg_seed
-from ding.utils.data import create_dataset
+from ding.utils import set_pkg_seed, create_dataset
 
-from torch.utils.data import DataLoader
+import torch.distributed
+from torch.utils.data import DataLoader, DistributedSampler
 
+import adaptdl
 
 def serial_pipeline_offline(
         input_cfg: Union[str, Tuple[dict, dict]],
@@ -38,6 +39,8 @@ def serial_pipeline_offline(
     Returns:
         - policy (:obj:`Policy`): Converged policy.
     """
+    adaptdl.torch.init_process_group("nccl" if torch.cuda.is_available() else "gloo") # for adaptdl
+
     if isinstance(input_cfg, str):
         cfg, create_cfg = read_config(input_cfg)
     else:
@@ -57,7 +60,11 @@ def serial_pipeline_offline(
     tb_logger = SummaryWriter(os.path.join('./{}/log/'.format(cfg.exp_name), 'serial'))
     # import ipdb; ipdb.set_trace()
     dataset = create_dataset(cfg)
-    dataloader = DataLoader(dataset, cfg.policy.learn.batch_size, collate_fn=lambda x: x)
+    # dataloader = DataLoader(dataset, cfg.policy.learn.batch_size, collate_fn=lambda x: x)
+    dataloader = adaptdl.torch.AdaptiveDataLoader(dataset, cfg.policy.learn.batch_size, collate_fn=lambda x: x, pin_memory=True) # for adaptdl
+    dataloader.autoscale_batch_size(16384, 
+        local_bsz_bounds=(cfg.policy.learn.batch_size, 64*cfg.policy.learn.batch_size))  # for adaptdl
+
     learner = BaseLearner(cfg.policy.learn.learner, policy.learn_mode, tb_logger, exp_name=cfg.exp_name)
     evaluator = InteractionSerialEvaluator(
         cfg.policy.eval.evaluator, evaluator_env, policy.eval_mode, tb_logger, exp_name=cfg.exp_name
@@ -69,7 +76,8 @@ def serial_pipeline_offline(
     learner.call_hook('before_run')
     stop = False
 
-    for epoch in range(cfg.policy.learn.train_epoch):
+    # for epoch in range(cfg.policy.learn.train_epoch):
+    for epoch in adaptdl.torch.remaining_epochs_until(cfg.policy.learn.train_epoch): # for adaptdl
         # Evaluate policy performance
         for i, train_data in enumerate(dataloader):
             if evaluator.should_eval(learner.train_iter):

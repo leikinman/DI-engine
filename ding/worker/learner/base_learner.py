@@ -231,12 +231,15 @@ class BaseLearner(object):
                     new_k = k.split(']')[-1]
                     histogram_vars[new_k] = elem.pop(k)
             # Update log_buffer
-            self._log_buffer['scalar'].update(elem)
+            # Do dont why _log_buffer['scalar'] is not class 'LogDict' in mult-GPU
+            tmp = build_log_buffer()
+            tmp.update(self._log_buffer['scalar'])
+            tmp.update(elem)
+            self._log_buffer['scalar'] = tmp
             self._log_buffer['scalars'].update(scalars_vars)
             self._log_buffer['histogram'].update(histogram_vars)
-
-            self.call_hook('after_iter')
-            self._last_iter.add(1)
+        self.call_hook('after_iter')
+        self._last_iter.add(1)
 
     @auto_checkpoint
     def start(self) -> None:

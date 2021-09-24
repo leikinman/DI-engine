@@ -244,7 +244,10 @@ class QAC(nn.Module):
             action = action.unsqueeze(1)
         x = torch.cat([obs, action], dim=1)
         if self.twin_critic:
-            x = [m(x)['pred'] for m in self.critic]
+            if isinstance(self.critic, torch.nn.parallel.DistributedDataParallel):
+                x = [m(x)['pred'] for m in self.critic.module]
+            else:
+                x = [m(x)['pred'] for m in self.critic]
         else:
             x = self.critic(x)['pred']
         return {'q_value': x}

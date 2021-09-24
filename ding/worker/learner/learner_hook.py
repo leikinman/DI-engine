@@ -282,7 +282,7 @@ class LogReduceHook(LearnerHook):
                 if ding.enable_linklink:
                     allreduce(new_data)
                 else:
-                    new_data = new_data.to(get_rank())
+                    new_data = new_data.to(get_rank() % torch.cuda.device_count())
                     allreduce(new_data)
                     new_data = new_data.cpu()
             elif isinstance(data, numbers.Integral) or isinstance(data, numbers.Real):
@@ -290,7 +290,7 @@ class LogReduceHook(LearnerHook):
                 if ding.enable_linklink:
                     allreduce(new_data)
                 else:
-                    new_data = new_data.to(get_rank())
+                    new_data = new_data.to(get_rank() % torch.cuda.device_count())
                     allreduce(new_data)
                     new_data = new_data.cpu()
                 new_data = new_data.item()

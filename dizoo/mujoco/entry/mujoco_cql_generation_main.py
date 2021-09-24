@@ -1,5 +1,5 @@
 from dizoo.mujoco.config.hopper_sac_data_generation_default_config import main_config, create_config
-from ding.entry import collect_demo_data, eval
+from ding.entry import collect_demo_data, eval, serial_pipeline
 import torch
 import copy
 
@@ -15,6 +15,11 @@ def generate(args):
     collect_demo_data(config, collect_count=main_config.policy.other.replay_buffer.replay_buffer_size,
                       seed=args.seed, expert_data_path=main_config.policy.learn.save_path, state_dict=state_dict)
 
+def train_expert(args):
+    from dizoo.mujoco.config.hopper_sac_default_config import main_config, create_config
+    config = copy.deepcopy([main_config, create_config])
+    serial_pipeline(config, seed=args.seed, max_iterations=int(1e6))
+
 
 if __name__ == "__main__":
     import argparse
@@ -23,5 +28,7 @@ if __name__ == "__main__":
     parser.add_argument('--seed', '-s', type=int, default=0)
     args = parser.parse_args()
 
+    # train an expert to collect data if need
+    train_expert(args)
     eval_ckpt(args)
     generate(args)

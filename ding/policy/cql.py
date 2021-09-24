@@ -14,6 +14,8 @@ from ding.utils.data import default_collate, default_decollate
 from .base_policy import Policy
 from .common_utils import default_preprocess_learn
 
+import adaptdl
+import adaptdl.torch
 
 @POLICY_REGISTRY.register('cql')
 class CQLPolicy(Policy):
@@ -264,6 +266,10 @@ class CQLPolicy(Policy):
             )
             self._auto_alpha = False
 
+        # for adaptdl
+        self._model.critic = adaptdl.torch.AdaptiveDataParallel(self._model.critic, self._optimizer_q, name="critic")
+        self._model.actor = adaptdl.torch.AdaptiveDataParallel(self._model.actor, self._optimizer_policy, name="actor")
+
         # Main and target models
         self._target_model = copy.deepcopy(self._model)
         self._target_model = model_wrap(
@@ -414,9 +420,12 @@ class CQLPolicy(Policy):
 
         # update q network
         self._optimizer_q.zero_grad()
-        loss_dict['critic_loss'].backward(retain_graph=True)
         if self._twin_critic:
-            loss_dict['twin_critic_loss'].backward()
+            # in order to do BP once
+            loss = loss_dict['critic_loss'] + loss_dict['twin_critic_loss']
+            loss.backward()
+        else:
+            loss_dict['critic_loss'].backward()
         self._optimizer_q.step()
 
         # evaluate to get action distribution
@@ -492,12 +501,17 @@ class CQLPolicy(Policy):
         # target update
         self._target_model.update(self._learn_model.state_dict())
         return {
+            'cur_bsz': float(len(data['obs'])),
             'cur_lr_q': self._optimizer_q.defaults['lr'],
             'cur_lr_p': self._optimizer_policy.defaults['lr'],
             'priority': td_error_per_sample.abs().tolist(),
             'td_error': td_error_per_sample.detach().mean().item(),
             'alpha': self._alpha.item(),
             'target_value': target_value.detach().mean().item(),
+            'actor_gns_sqr': self._model.actor.gns.sqr_avg(), 
+            'actor_gns_var': self._model.actor.gns.var_avg(),
+            'critic_grad_sqr': self._model.critic.gns.sqr_avg(), 
+            'critic_grad_var': self._model.critic.gns.var_avg(),
             **info_dict,
             **loss_dict
         }
@@ -628,12 +642,12 @@ class CQLPolicy(Policy):
         if self._auto_alpha:
             return super()._monitor_vars_learn() + [
                 'alpha_loss', 'policy_loss', 'critic_loss', 'cur_lr_q', 'cur_lr_p', 'target_q_value', 'q_value_1',
-                'q_value_2', 'alpha', 'td_error', 'target_value'
+                'q_value_2', 'alpha', 'td_error', 'target_value', 'cur_bsz', 'actor_gns_sqr', 'actor_gns_var', 'critic_gns_sqr', 'critic_gns_var'
             ] + twin_critic
         else:
             return super()._monitor_vars_learn() + [
                 'policy_loss', 'critic_loss', 'cur_lr_q', 'cur_lr_p', 'target_q_value', 'q_value_1', 'q_value_2',
-                'alpha', 'td_error', 'target_value'
+                'alpha', 'td_error', 'target_value', 'cur_bsz', 'actor_gns_sqr', 'actor_gns_var', 'critic_gns_sqr', 'critic_gns_var'
             ] + twin_critic
 
     def _get_policy_actions(self, data: Dict, num_actions=10, epsilon: float = 1e-6) -> List:

@@ -9,7 +9,7 @@ hopper_sac_default_config = dict(
         evaluator_env_num=8,
         use_act_scale=True,
         n_evaluator_episode=8,
-        stop_value=6000,
+        stop_value=3500,
     ),
     policy=dict(
         cuda=True,
@@ -41,7 +41,7 @@ hopper_sac_default_config = dict(
             unroll_len=1,
         ),
         command=dict(),
-        eval=dict(),
+        eval=dict(evaluator=dict(eval_freq=10000, )),
         other=dict(replay_buffer=dict(replay_buffer_size=1000000, ), ),
     ),
 )
